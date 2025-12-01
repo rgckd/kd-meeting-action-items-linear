@@ -137,26 +137,34 @@ function getOpenActionsFromLast4WeeksInThisDoc() {
   const formattedDate = fourWeeksAgo.toISOString().split('T')[0];
   
   // Call Gemini API to extract action items
-  const prompt = `You are analyzing meeting notes to extract action items. 
-  
-Extract all action items from meetings dated ${formattedDate} or later from the following text.
+  const prompt = `You are analyzing meeting notes to extract ALL action items and tasks assigned to people.
 
-For each action item, identify:
-1. The assignee name (person responsible)
-2. The action description
+Look for patterns like:
+- "Weekly Action Items:"
+- Sections with person names followed by colons (e.g., "Sushanth Jain:", "Nilesh Shirbhate:")
+- Tasks/actions listed under person names
+- Bullet points with action items
+- Any task that needs to be done by someone
 
-Return ONLY a JSON array of objects with this exact format:
+Extract ALL action items from dates ${formattedDate} or later.
+
+For each action item found, return:
+1. The assignee name (person responsible) - use their full name as written
+2. The complete action description
+
+Return ONLY a JSON array with this exact format (no markdown, no code blocks):
 [
-  {"assignee": "FirstName LastName", "description": "Action item text"},
-  {"assignee": "FirstName LastName", "description": "Action item text"}
+  {"assignee": "Sushanth Jain", "description": "Propose the milestone and the hiring plan"},
+  {"assignee": "Nilesh Shirbhate", "description": "Negotiate and finalize the rate for Danish"}
 ]
 
-Rules:
-- Only include incomplete/open action items
-- Do NOT include items already marked as done or completed
-- Keep descriptions concise but complete
-- If no assignee is clear, use "Unassigned"
-- Only return the JSON array, no other text
+IMPORTANT:
+- Extract EVERY action item you find under person names
+- Use the exact names as they appear (e.g., "Sushanth Jain", not "Sushanth")
+- Include all context from the action description
+- If an action has no clear assignee, use "Unassigned"
+- Return an empty array [] if truly no action items exist
+- Do NOT include explanatory text, only the JSON array
 
 Meeting notes text:
 
