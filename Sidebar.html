@@ -33,20 +33,26 @@
         document.getElementById('loading').style.display = yes ? 'block' : 'none';
         document.querySelectorAll('button').forEach(b => b.disabled = yes);
       }
+
       function show(msg, error = false) {
         const el = document.getElementById('result');
         el.textContent = msg;
         el.className = 'result ' + (error ? 'error' : 'success');
       }
+
       function jump() { google.script.run.jumpToActionItems(); }
+
       function update() {
-        setWorking(true); show('Updating Action Items…');
+        setWorking(true);
+        show('Updating Action Items…');
         google.script.run.withSuccessHandler(m => { show(m); setWorking(false); })
                         .withFailureHandler(e => { show('Error: ' + e.message, true); setWorking(false); })
                         .updateActionItemsSection();
       }
+
       function push() {
-        setWorking(true); show('Pushing to Linear…');
+        setWorking(true);
+        show('Pushing to Linear…');
         google.script.run.withSuccessHandler(m => { show(m); setWorking(false); })
                         .withFailureHandler(e => { show('Error: ' + e.message, true); setWorking(false); })
                         .pushActionsToLinear();
