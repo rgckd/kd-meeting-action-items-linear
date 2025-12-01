@@ -136,46 +136,84 @@ function getOpenActionsFromLast4WeeksInThisDoc() {
   for (const p of paragraphs) {
     const text = p.getText().trim();
 
-    // Date detection
+    // Date detection - matches various formats including "2025-11-25"
     const dateMatch = text.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,?\s+[A-Za-z]+\s+\d{1,2},?\s+\d{4}|^\d{4}-\d{2}-\d{2}$/);
     if (dateMatch) {
       const d = new Date(dateMatch[0]);
       if (!isNaN(d)) currentDate = d;
     }
 
-    // Action items under a recent date section
-    if (text.match(/^Action items?$/i) &&
+    // Action items under a recent date section - now also matches "Weekly Action Items:"
+    if (text.match(/^(?:Weekly\s+)?Action items?:?$/i) &&
         currentDate &&
         currentDate >= fourWeeksAgo) {
 
+      let currentAssignee = null;
       let item = p.getNextSibling();
-      while (item && item.getType() === DocumentApp.ElementType.LIST_ITEM) {
-        const li = item.asListItem();
-        const unchecked = [
-          DocumentApp.GlyphType.SQUARE,
-          DocumentApp.GlyphType.HOLLOW_BULLET
-        ].includes(li.getGlyphType());
+      
+      while (item) {
+        // Stop at next major heading or another date
+        if (item.getType() === DocumentApp.ElementType.PARAGRAPH) {
+          const pText = item.asParagraph().getText().trim();
+          
+          // Check if it's another heading or date that signals end of action items
+          if (pText.match(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)|^\d{4}-\d{2}-\d{2}|^(?:I{1,3}|IV|V|VI{0,3})\./i)) {
+            break;
+          }
+          
+          // Check if this is an assignee line (ends with colon, no other text)
+          if (pText.match(/^[\w\s]+:$/) && pText.length < 50) {
+            currentAssignee = pText.replace(':', '').trim();
+            item = item.getNextSibling();
+            continue;
+          }
+          
+          // Check if this is an action item (plain paragraph under an assignee)
+          if (currentAssignee && pText.length > 0 && !pText.match(/^[\w\s]+:$/)) {
+            const description = pText.replace(/\(\w+-\d+\)$/, '').trim();
+            if (description) {
+              const key = `${description.toLowerCase()}|||${currentAssignee}`;
+              if (!actionsMap[key]) {
+                actionsMap[key] = {
+                  text: `@${currentAssignee} ${description}`
+                };
+              }
+            }
+            item = item.getNextSibling();
+            continue;
+          }
+        }
+        
+        // Handle traditional list items
+        if (item.getType() === DocumentApp.ElementType.LIST_ITEM) {
+          const li = item.asListItem();
+          const unchecked = [
+            DocumentApp.GlyphType.SQUARE,
+            DocumentApp.GlyphType.HOLLOW_BULLET
+          ].includes(li.getGlyphType());
 
-        if (unchecked) {
-          const raw = li.getText()
-            .replace(/^[-•·]\s*/, '')
-            .replace(/\(\w+-\d+\)$/, '')
-            .trim();
+          if (unchecked) {
+            const raw = li.getText()
+              .replace(/^[-•·]\s*/, '')
+              .replace(/\(\w+-\d+\)$/, '')
+              .trim();
 
-          const assignee = raw.match(/@(\w+)/)?.[1] || 'Unassigned';
-          const description = raw.replace(/^@\w+\s+/, '');
+            const assignee = raw.match(/@(\w+)/)?.[1] || currentAssignee || 'Unassigned';
+            const description = raw.replace(/^@\w+\s+/, '');
 
-          if (description) {
-            const key = `${description.toLowerCase()}|||${assignee}`;
-            if (!actionsMap[key]) {
-              actionsMap[key] = {
-                text: assignee === 'Unassigned'
-                  ? description
-                  : `@${assignee} ${description}`
-              };
+            if (description) {
+              const key = `${description.toLowerCase()}|||${assignee}`;
+              if (!actionsMap[key]) {
+                actionsMap[key] = {
+                  text: assignee === 'Unassigned'
+                    ? description
+                    : `@${assignee} ${description}`
+                };
+              }
             }
           }
         }
+        
         item = item.getNextSibling();
       }
     }
