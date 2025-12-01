@@ -21,7 +21,6 @@
   <body>
     <h2>Meeting Action Items</h2>
     
-    <button onclick="jump()">Go to Action Items Tab</button>
     <button onclick="update()">1. Update Action Items<br><small>(last 4 weeks)</small></button>
     <button onclick="push()">2. Push to Linear<br><small>(creates issues in your project)</small></button>
     
@@ -39,8 +38,6 @@
         el.textContent = msg;
         el.className = 'result ' + (error ? 'error' : 'success');
       }
-
-      function jump() { google.script.run.jumpToActionItems(); }
 
       function update() {
         setWorking(true);
