@@ -225,15 +225,21 @@ function callGeminiAPI(prompt) {
     }
     
     const text = json.candidates[0].content.parts[0].text;
+    Logger.log('Gemini raw response: ' + text);
     
     // Extract JSON from the response (handle markdown code blocks if present)
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      Logger.log('Gemini response: ' + text);
+      Logger.log('No JSON array found in response');
+      Logger.log('Full response: ' + text);
       return [];
     }
     
-    return JSON.parse(jsonMatch[0]);
+    const parsedActions = JSON.parse(jsonMatch[0]);
+    Logger.log('Parsed actions count: ' + parsedActions.length);
+    Logger.log('Actions: ' + JSON.stringify(parsedActions, null, 2));
+    
+    return parsedActions;
     
   } catch (e) {
     Logger.log('Error calling Gemini API: ' + e.message);
