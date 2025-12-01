@@ -141,7 +141,7 @@ function getOpenActionsFromLast4WeeksInThisDoc() {
 
 Look for patterns like:
 - "Weekly Action Items:"
-- Sections with person names followed by colons (e.g., "Sushanth Jain:", "Nilesh Shirbhate:")
+- Sentences with person names (e.g., Nilesh, Sushanth, Ashish, Aditi, Chaitra, Ganesh, Sunil, Brian, Nainish)
 - Tasks/actions listed under person names
 - Bullet points with action items
 - Any task that needs to be done by someone
