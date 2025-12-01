@@ -90,15 +90,20 @@ function updateActionItemsSection() {
   if (actions.length === 0) {
     body.insertParagraph(insertIndex++, 'No open action items from the last 4 weeks.');
   } else {
-    // Create checklist
-    const first = body.insertListItem(insertIndex++, actions[0].text);
-    first.setGlyphType(DocumentApp.GlyphType.SQUARE);
-    const listId = first.getListId();
-
-    for (let i = 1; i < actions.length; i++) {
+    // Create checklist - insert all items first, then set properties
+    const items = [];
+    for (let i = 0; i < actions.length; i++) {
       const item = body.insertListItem(insertIndex++, actions[i].text);
       item.setGlyphType(DocumentApp.GlyphType.SQUARE);
-      item.setListId(listId);
+      items.push(item);
+    }
+    
+    // Set all items to use the same list (makes them part of same checklist)
+    if (items.length > 1) {
+      const firstListId = items[0].getListId();
+      for (let i = 1; i < items.length; i++) {
+        items[i].setListId(firstListId);
+      }
     }
   }
 
