@@ -12,7 +12,8 @@ function getConfig() {
     LINEAR_API_KEY: props.LINEAR_API_KEY,
     LINEAR_TEAM_ID: props.LINEAR_TEAM_ID,
     LINEAR_PROJECT_ID: props.LINEAR_PROJECT_ID,
-    ACTION_ITEMS_BOOKMARK: props.ACTION_ITEMS_BOOKMARK // required bookmark id
+    ACTION_ITEMS_BOOKMARK: props.ACTION_ITEMS_BOOKMARK, // required bookmark id
+    GEMINI_API_KEY: props.GEMINI_API_KEY // required for AI extraction
   };
 }
 // =====================================================
@@ -124,102 +125,112 @@ function clearSectionBelow(body, startIndex) {
 }
 
 /**
- * Scans full document and extracts open action items from last 4 weeks
+ * Scans full document and extracts open action items from last 4 weeks using Gemini AI
  */
 function getOpenActionsFromLast4WeeksInThisDoc() {
-  const paragraphs = DocumentApp.getActiveDocument().getBody().getParagraphs();
+  const doc = DocumentApp.getActiveDocument();
+  const body = doc.getBody();
+  const fullText = body.getText();
+  
+  // Get last 4 weeks of content
   const fourWeeksAgo = new Date(new Date().setDate(new Date().getDate() - 28));
+  const formattedDate = fourWeeksAgo.toISOString().split('T')[0];
+  
+  // Call Gemini API to extract action items
+  const prompt = `You are analyzing meeting notes to extract action items. 
+  
+Extract all action items from meetings dated ${formattedDate} or later from the following text.
 
+For each action item, identify:
+1. The assignee name (person responsible)
+2. The action description
+
+Return ONLY a JSON array of objects with this exact format:
+[
+  {"assignee": "FirstName LastName", "description": "Action item text"},
+  {"assignee": "FirstName LastName", "description": "Action item text"}
+]
+
+Rules:
+- Only include incomplete/open action items
+- Do NOT include items already marked as done or completed
+- Keep descriptions concise but complete
+- If no assignee is clear, use "Unassigned"
+- Only return the JSON array, no other text
+
+Meeting notes text:
+
+${fullText}`;
+
+  const actions = callGeminiAPI(prompt);
+  
+  // Convert to the format expected by the rest of the script
   const actionsMap = {};
-  let currentDate = null;
-
-  for (const p of paragraphs) {
-    const text = p.getText().trim();
-
-    // Date detection - matches various formats including "2025-11-25"
-    const dateMatch = text.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,?\s+[A-Za-z]+\s+\d{1,2},?\s+\d{4}|^\d{4}-\d{2}-\d{2}$/);
-    if (dateMatch) {
-      const d = new Date(dateMatch[0]);
-      if (!isNaN(d)) currentDate = d;
-    }
-
-    // Action items under a recent date section - now also matches "Weekly Action Items:"
-    if (text.match(/^(?:Weekly\s+)?Action items?:?$/i) &&
-        currentDate &&
-        currentDate >= fourWeeksAgo) {
-
-      let currentAssignee = null;
-      let item = p.getNextSibling();
-      
-      while (item) {
-        // Stop at next major heading or another date
-        if (item.getType() === DocumentApp.ElementType.PARAGRAPH) {
-          const pText = item.asParagraph().getText().trim();
-          
-          // Check if it's another heading or date that signals end of action items
-          if (pText.match(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)|^\d{4}-\d{2}-\d{2}|^(?:I{1,3}|IV|V|VI{0,3})\./i)) {
-            break;
-          }
-          
-          // Check if this is an assignee line (ends with colon, no other text)
-          if (pText.match(/^[\w\s]+:$/) && pText.length < 50) {
-            currentAssignee = pText.replace(':', '').trim();
-            item = item.getNextSibling();
-            continue;
-          }
-          
-          // Check if this is an action item (plain paragraph under an assignee)
-          if (currentAssignee && pText.length > 0 && !pText.match(/^[\w\s]+:$/)) {
-            const description = pText.replace(/\(\w+-\d+\)$/, '').trim();
-            if (description) {
-              const key = `${description.toLowerCase()}|||${currentAssignee}`;
-              if (!actionsMap[key]) {
-                actionsMap[key] = {
-                  text: `@${currentAssignee} ${description}`
-                };
-              }
-            }
-            item = item.getNextSibling();
-            continue;
-          }
-        }
-        
-        // Handle traditional list items
-        if (item.getType() === DocumentApp.ElementType.LIST_ITEM) {
-          const li = item.asListItem();
-          const unchecked = [
-            DocumentApp.GlyphType.SQUARE,
-            DocumentApp.GlyphType.HOLLOW_BULLET
-          ].includes(li.getGlyphType());
-
-          if (unchecked) {
-            const raw = li.getText()
-              .replace(/^[-•·]\s*/, '')
-              .replace(/\(\w+-\d+\)$/, '')
-              .trim();
-
-            const assignee = raw.match(/@(\w+)/)?.[1] || currentAssignee || 'Unassigned';
-            const description = raw.replace(/^@\w+\s+/, '');
-
-            if (description) {
-              const key = `${description.toLowerCase()}|||${assignee}`;
-              if (!actionsMap[key]) {
-                actionsMap[key] = {
-                  text: assignee === 'Unassigned'
-                    ? description
-                    : `@${assignee} ${description}`
-                };
-              }
-            }
-          }
-        }
-        
-        item = item.getNextSibling();
-      }
+  for (const action of actions) {
+    const key = `${action.description.toLowerCase()}|||${action.assignee}`;
+    if (!actionsMap[key]) {
+      actionsMap[key] = {
+        text: action.assignee === 'Unassigned' 
+          ? action.description 
+          : `@${action.assignee} ${action.description}`
+      };
     }
   }
-
+  
   return Object.values(actionsMap);
+}
+
+/**
+ * Calls Gemini API to analyze text and extract action items
+ */
+function callGeminiAPI(prompt) {
+  if (!CONFIG.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY not configured in Script Properties');
+  }
+  
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`;
+  
+  const payload = {
+    contents: [{
+      parts: [{
+        text: prompt
+      }]
+    }],
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 2048
+    }
+  };
+  
+  try {
+    const response = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    
+    const json = JSON.parse(response.getContentText());
+    
+    if (json.error) {
+      throw new Error(`Gemini API Error: ${json.error.message}`);
+    }
+    
+    const text = json.candidates[0].content.parts[0].text;
+    
+    // Extract JSON from the response (handle markdown code blocks if present)
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      Logger.log('Gemini response: ' + text);
+      return [];
+    }
+    
+    return JSON.parse(jsonMatch[0]);
+    
+  } catch (e) {
+    Logger.log('Error calling Gemini API: ' + e.message);
+    throw new Error('Failed to extract action items using AI: ' + e.message);
+  }
 }
 
 /**
