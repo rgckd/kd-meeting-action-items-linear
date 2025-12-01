@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body { font-family: 'Google Sans', Arial, sans-serif; padding: 24px; background: #f8f9fa; margin: 0; }
+      h2 { text-align: center; color: #1a73e8; margin: 0 0 24px; font-size: 22px; }
+      button {
+        width: 100%; padding: 16px; margin: 12px 0; font-size: 16px; font-weight: 500;
+        background: #1a73e8; color: white; border: none; border-radius: 8px;
+        cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      }
+      button:hover { background: #1557b0; }
+      button:disabled { background: #ccc; cursor: not-allowed; }
+      .loading { text-align: center; padding: 16px; color: #5f6368; display: none; font-style: italic; }
+      .result { margin-top: 20px; padding: 16px; background: white; border-radius: 8px; border-left: 4px solid #1a73e8; min-height: 50px; text-align: center; }
+      .success { border-left-color: #137333; background: #e6f4ea; }
+      .error { border-left-color: #d93025; background: #fce8e6; }
+    </style>
+  </head>
+  <body>
+    <h2>Meeting Action Items</h2>
+    
+    <button onclick="jump()">Go to Action Items Tab</button>
+    <button onclick="update()">1. Update Action Items<br><small>(last 4 weeks)</small></button>
+    <button onclick="push()">2. Push to Linear<br><small>(creates issues in your project)</small></button>
+    
+    <div id="loading" class="loading">Working…</div>
+    <div id="result" class="result">Ready. Click a button to start.</div>
+
+    <script>
+      function setWorking(yes) {
+        document.getElementById('loading').style.display = yes ? 'block' : 'none';
+        document.querySelectorAll('button').forEach(b => b.disabled = yes);
+      }
+      function show(msg, error = false) {
+        const el = document.getElementById('result');
+        el.textContent = msg;
+        el.className = 'result ' + (error ? 'error' : 'success');
+      }
+      function jump() { google.script.run.jumpToActionItems(); }
+      function update() {
+        setWorking(true); show('Updating Action Items…');
+        google.script.run.withSuccessHandler(m => { show(m); setWorking(false); })
+                        .withFailureHandler(e => { show('Error: ' + e.message, true); setWorking(false); })
+                        .updateActionItemsSection();
+      }
+      function push() {
+        setWorking(true); show('Pushing to Linear…');
+        google.script.run.withSuccessHandler(m => { show(m); setWorking(false); })
+                        .withFailureHandler(e => { show('Error: ' + e.message, true); setWorking(false); })
+                        .pushActionsToLinear();
+      }
+    </script>
+  </body>
+</html>
