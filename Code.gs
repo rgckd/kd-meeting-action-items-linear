@@ -228,7 +228,10 @@ function callGeminiAPI(prompt) {
     Logger.log('Gemini raw response: ' + text);
     
     // Extract JSON from the response (handle markdown code blocks if present)
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    // Remove markdown code block markers
+    let cleanText = text.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    
+    const jsonMatch = cleanText.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       Logger.log('No JSON array found in response');
       Logger.log('Full response: ' + text);
@@ -237,9 +240,22 @@ function callGeminiAPI(prompt) {
     
     const parsedActions = JSON.parse(jsonMatch[0]);
     Logger.log('Parsed actions count: ' + parsedActions.length);
-    Logger.log('Actions: ' + JSON.stringify(parsedActions, null, 2));
     
-    return parsedActions;
+    // Filter out incomplete/garbage entries and deduplicate
+    const filtered = parsedActions.filter(action => {
+      // Skip if assignee or description is missing
+      if (!action.assignee || !action.description) return false;
+      // Skip very short or incomplete descriptions
+      if (action.description.length < 10) return false;
+      // Skip descriptions that are just fragments like "to email", "to confirm"
+      if (action.description.match(/^to\s+\w+$/i)) return false;
+      return true;
+    });
+    
+    Logger.log('Filtered actions count: ' + filtered.length);
+    Logger.log('Actions: ' + JSON.stringify(filtered.slice(0, 10), null, 2)); // Log first 10
+    
+    return filtered;
     
   } catch (e) {
     Logger.log('Error calling Gemini API: ' + e.message);
