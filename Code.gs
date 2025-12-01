@@ -137,34 +137,32 @@ function getOpenActionsFromLast4WeeksInThisDoc() {
   const formattedDate = fourWeeksAgo.toISOString().split('T')[0];
   
   // Call Gemini API to extract action items
-  const prompt = `You are analyzing meeting notes to extract ALL action items and tasks assigned to people.
+    const prompt = `You are an expert action item extractor. Your task is to analyze the provided meeting notes and extract ALL open action items and tasks that are explicitly assigned to an individual or a group.
 
-Look for patterns like:
-- "Weekly Action Items:"
-- Sentences with person names (e.g., Nilesh, Sushanth, Ashish, Aditi, Chaitra, Ganesh, Sunil, Brian, Nainish)
-- Tasks/actions listed under person names
-- Bullet points with action items
-- Any task that needs to be done by someone
+**Scope:**
+Analyze the content under the meeting notes sections dated **2025-12-02, 2025-11-25, 2025-11-18, 2025-11-11, and 2025-11-04**.
 
-Extract ALL action items from dates ${formattedDate} or later.
+**Action Item and Owner Identification:**
+An action item is a task, follow-up, or to-do. The owner is the person/group assigned to it. Look for the following patterns to identify them:
 
-For each action item found, return:
-1. The assignee name (person responsible) - use their full name as written
-2. The complete action description
+  - Sections explicitly titled, e.g., "**Consolidated Action Items**" or "**Action Items for [Name]**".
+  - Numbered or bulleted lists (e.g., \`1.\`, \`a.\`, \`-\`) that describe a task, often followed by a person's name or email in brackets (e.g., \`[Nilesh Shirbhate]\`, \`[ganesh@kickdrumtech.com]\`).
+  - Sentences where a person's name is followed by a verb indicating a required action (e.g., "Ganesh Ramamoorthy to put together...", "[Nilesh Shirbhate] to negotiate...").
+  - Incomplete actions or questions directed to a specific person (e.g., "What's holding this up? [Nainish Dalal]/[Nilesh Shirbhate]").
 
-Return ONLY a JSON array with this exact format (no markdown, no code blocks):
+**Output Requirements:**
+Return **ONLY** a JSON array with this exact structure (no markdown, no code blocks, no introductory/explanatory text):
 [
-  {"assignee": "Sushanth Jain", "description": "Propose the milestone and the hiring plan"},
-  {"assignee": "Nilesh Shirbhate", "description": "Negotiate and finalize the rate for Danish"}
+{"assignee": "Full Name as Written", "description": "The complete action description text"},
+...
 ]
 
-IMPORTANT:
-- Extract EVERY action item you find under person names
-- Use the exact names as they appear (e.g., "Sushanth Jain", not "Sushanth")
-- Include all context from the action description
-- If an action has no clear assignee, use "Unassigned"
-- Return an empty array [] if truly no action items exist
-- Do NOT include explanatory text, only the JSON array
+**Constraints:**
+
+  - **Extract EVERY** task or follow-up.
+  - Use the **exact, full name** of the assignee as it appears in the text (e.g., "Sushanth Jain", "Nilesh Shirbhate", not "Sushanth" or "Nilesh").
+  - If an action has **no clear assignee**, use \`"Unassigned"\`.
+  - If no action items are found in the specified dates, return an empty array \`[]\`.
 
 Meeting notes text:
 
